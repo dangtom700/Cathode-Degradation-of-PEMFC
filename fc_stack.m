@@ -19,10 +19,18 @@ function s = fc_stack(j, age_h, x, P)
     end
     P_cmp_out = Pout + dp + P.dp_hum;
     
-    s.P_comp  = mair * 1005 * P.T_amb / (P.eta_is * P.eta_mot) * ((P_cmp_out/P.P0)^(0.4/1.4) - 1);
-    s.P_pump  = P.dp_cl * (P.F_cl/6)^2 * 1e3 * P.F_cl/60000 / P.eta_pump;
+    s.P_comp  = compressor(P, mair, P_cmp_out);
+    s.P_pump  = pump(P);
     s.P_stack = P.N * I * U;
     s.P_net   = s.P_stack - s.P_comp - s.P_pump;
     s.V_stack = P.N * U;
     s.U = U;  s.T_cell = T_cell;
+end
+
+function out = compressor(P, mair, P_cmp_out)
+    out = mair * 1005 * P.T_amb / (P.eta_is * P.eta_mot) * ((P_cmp_out/P.P0)^(0.4/1.4) - 1);
+end
+
+function out = pump(P)
+    out = P.dp_cl * (P.F_cl/6)^2 * 1e3 * P.F_cl/60000 / P.eta_pump;
 end
