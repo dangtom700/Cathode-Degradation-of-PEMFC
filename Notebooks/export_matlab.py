@@ -14,7 +14,7 @@ import pandas as pd
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(HERE)
 DB_PATH = os.path.join(PROJECT_DIR, "cathode_degradation.db")
-OUT_DIR = os.path.join(PROJECT_DIR, "MATLAB", "data")
+OUT_DIR = os.path.join(PROJECT_DIR, "MATLAB")
 CELL_AREA_CM2 = 280.0
 NOMINAL = {"p_c": 150.0, "T_cin": 70.0, "lambda_c": 1.7}
 
