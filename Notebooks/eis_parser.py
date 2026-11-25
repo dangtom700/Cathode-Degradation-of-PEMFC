@@ -72,9 +72,19 @@ def parse_eis_file(path):
         "amplitude_A": float(ampl.group(1)) if ampl else None,
         "area_cm2": _first_float(header.get("(area/cm^2)")),
         "temperature_raw": header.get("Temperature"),
-        "meas_date": (header.get("File", "").split("-", 1)[-1].strip() or None),
+        "meas_date": (header.get("File", "").rsplit(" - ", 1)[-1].strip() or None),   # file names contain '-'
+        # measurement channel (last CHxx in the System line) -> stable cell id across ages
+        "channel": (int(re.findall(r"CH(\d+)", header.get("System", ""))[-1])
+                    if re.findall(r"CH(\d+)", header.get("System", "")) else None),
         "meas_time": header.get("Time"),
     }
+
+    # Two Zahner export formats exist in this dataset:
+    #   polar     : Number Frequency/Hz impedance/Ohm   Phase/deg       ...  (BoL cell, 1150 h cell, BoL spatial)
+    #   cartesian : Number Frequency/Hz impedance_R/Ohm impedance_I/Ohm ...  (all 2300 h, 1150 h spatial,
+    #                                                                        every sensitivity-variation file)
+    cartesian = "impedance_R" in lines[data_start]
+    meta["data_format"] = "cartesian" if cartesian else "polar"
 
     rows = []
     for ln in lines[data_start + 1:]:
@@ -82,9 +92,16 @@ def parse_eis_file(path):
         if len(parts) >= len(DATA_COLS) and re.match(r"^\d+$", parts[0]):
             rows.append([float(x) for x in parts[:len(DATA_COLS)]])
     df = pd.DataFrame(rows, columns=DATA_COLS)
-    phi = df["phase_deg"] * math.pi / 180.0
-    df["Zreal_Ohm"] = df["Zmag_Ohm"] * phi.apply(math.cos)
-    df["Zimag_Ohm"] = df["Zmag_Ohm"] * phi.apply(math.sin)
+    if cartesian:
+        # columns 3/4 hold Z' and Z'' directly; derive |Z| and phase for consistency
+        df = df.rename(columns={"Zmag_Ohm": "Zreal_Ohm", "phase_deg": "Zimag_Ohm"})
+        df["Zmag_Ohm"] = (df["Zreal_Ohm"] ** 2 + df["Zimag_Ohm"] ** 2) ** 0.5
+        df["phase_deg"] = [math.degrees(math.atan2(i, r)) for r, i in zip(df["Zreal_Ohm"], df["Zimag_Ohm"])]
+    else:
+        phi = df["phase_deg"] * math.pi / 180.0
+        df["Zreal_Ohm"] = df["Zmag_Ohm"] * phi.apply(math.cos)
+        df["Zimag_Ohm"] = df["Zmag_Ohm"] * phi.apply(math.sin)
+    df = df[DATA_COLS + ["Zreal_Ohm", "Zimag_Ohm"]]
     return meta, df
 
 
@@ -132,6 +149,9 @@ META_COLS = [
     ("source_path", "TEXT"), ("potential_V", "REAL"), ("dc_current_A", "REAL"),
     ("amplitude_A", "REAL"), ("area_cm2", "REAL"), ("temperature_raw", "TEXT"),
     ("meas_date", "TEXT"), ("meas_time", "TEXT"),
+    ("data_format", "TEXT"),        # 'polar' or 'cartesian' (see parse_eis_file)
+    ("channel", "INTEGER"),         # cell channel CHxx (cells use CH01-05, CH07-11; CH06 = dead U6)
+    ("is_multi_cell", "INTEGER"),   # 1 = cell-folder file spanning several cells (e.g. 1150h tst00 @ -2.96 V)
 ]
 DATA_SQL = [("number", "INTEGER"), ("frequency_Hz", "REAL"), ("Zmag_Ohm", "REAL"),
             ("phase_deg", "REAL"), ("significance", "REAL"), ("time_s", "REAL"),
@@ -164,6 +184,9 @@ def load_eis_data(limit=None):
         meta = eis_metadata_from_path(kind, root, path)
         hdr, df = parse_eis_file(path)
         meta.update(hdr)
+        # a single cell sits at ~0.5-0.9 V; a cell-folder file above ~1.2 V spans several cells
+        pv = meta.get("potential_V")
+        meta["is_multi_cell"] = int(kind == "cell" and pv is not None and abs(pv) > 1.2)
         base = [meta[c] for c, _ in META_COLS]
         con.executemany(insert, [base + list(r) for r in df.itertuples(index=False)])
         n_files += 1
