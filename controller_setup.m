@@ -2,7 +2,8 @@
 clear; clc;
 
 %% 1. Dimensions and timing
-Ts  = 1; % s, controller / estimator sample time
+Ts  = 1; % s, apply for the simulate_load_cycle simulink
+%Ts = 60; % s, apply for the simulate_day_cycle simulink
 nu  = 5; % MVs: [current_density, pressure, lambda, temperature, humidity]
 nmd = 1; % MD : [load]
 ny  = 1;% OV : [SoC]
