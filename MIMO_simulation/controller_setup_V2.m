@@ -11,7 +11,8 @@ SoC and cell temperature.
 %% Setup: Adaptive MPC + Recursive ARX for PEMFC — SoC, Cell Temp, Degradation (MIMO)
 % OVs: [SoC (target 0.92), cell temperature (target 70C), voltage-loss rate (target 0)]
 % MVs: [current_density, pressure, lambda, cooling, humidity]   MD: [load]
-% Only apply for simulate_model.slx
+% Only apply for simulate_model_degradation_mode.slx and
+% simulate_model_opearting_loss.slx
 clear all; clc;
 
 %% 1. Dimensions and timing
