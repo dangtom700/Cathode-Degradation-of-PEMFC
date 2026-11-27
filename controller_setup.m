@@ -1,4 +1,5 @@
 %% Setup: Adaptive MPC + Recursive ARX for PEMFC + Battery SoC (target 0.92)
+% Only apply for simulate_day_cycle.slx and simulate_load_cycle.slx
 clear; clc;
 
 %% 1. Dimensions and timing
